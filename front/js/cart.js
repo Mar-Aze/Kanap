@@ -3,20 +3,25 @@
 /*---------------------------Affichage Panier-------------------*/
 
 //Récuperer les données du local storage
-let products = localStorage.getItem("allEntries");
-if (products) {
-    products = JSON.parse(products)
-   // Gestion asynchrone du chargement des produits et donc du DOM et des évènements
-   products = products.map((p) => fetch(`http://localhost:3000/api/products/${p.id}`)
-   .then(r => r.json())
-   .then((productDetail) => ({...p, price: productDetail.price}))
-) 
-Promise.all(products).then(p => {
-   loadCartDOM(p);
-   initEvents(p);
-   calculateTotal(p)
-})
+function getFullProducts() {
+  //Récuperer les données du local storage
+  let products = localStorage.getItem("allEntries");
+  if (products) {
+      products = JSON.parse(products)
+      // Gestion asynchrone du chargement des produits et donc du DOM et des évènements
+      const p = products.map((p) => fetch(`http://localhost:3000/api/products/${p.id}`)
+          .then(r => r.json())
+          .then((productDetail) => ({...p, price: productDetail.price})))
+      return Promise.all(p)
+  }
+  return Promise.resolve([])
 }
+
+getFullProducts().then(p => {
+  loadCartDOM(p);
+  initEvents();
+  calculateTotal()
+})
 
 //Insérer un produit et ses détails ajouté au panier
 
@@ -52,44 +57,45 @@ function loadCartDOM(products) {
 
 /*Créer des evenements sur le bouton supprimer et le champ de la quantité*/
 
-function initEvents (products){
+function initEvents (){
 //Créer un évenement sur le bouton supprimer
 const removeCartItemButton = document.querySelectorAll(".deleteItem");
   for(let i = 0; i < removeCartItemButton.length; i++) {
     let removeButton = removeCartItemButton[i];
-    removeButton.addEventListener("click", (event) => deleteCartItem(event, products));
+    removeButton.addEventListener("click", (event) => deleteCartItem(event));
   }
 //Créer un évenement sur la quantité
 const quantityInput = document.querySelectorAll(".itemQuantity");
   for(let i = 0; i < quantityInput.length; i++){
     let newQuantity = quantityInput[i];
-    newQuantity.addEventListener("change", (event) => setQuantity(event, products))
+    newQuantity.addEventListener("change", (event) => setQuantity(event))
   }
 }
 
 /*Supprimer un item du panier et du local storage*/
 
-function deleteCartItem (event, products) { 
-  //Chercher le produit à supprimer dans le local storage
-  const productId = event.target.closest("article").dataset.id; 
-  const productColor = event.target.closest("article").dataset.color; 
-  //Supprimer le produit du local storage 
-  const itemToDelete = products.findIndex(
-    (product) => (product.id === productId && product.color === productColor)); 
-  products.splice(itemToDelete, 1);
-  //Mettre à jour le localstorage
-  localStorage.removeItem("allEntries");
-  localStorage.setItem("allEntries", JSON.stringify(products)); 
-  //Supprimer le produit du DOM
-  event.target.closest("article").remove();
-  alert("Vous êtes sur le point de supprimer cet article de votre panier. Voulez-vous continuer ?");
-  //Mettre à jour le total du panier
-  calculateTotal(products);
+function deleteCartItem (event) { 
+  if (confirm("Vous êtes sur le point de supprimer cet article de votre panier. Voulez-vous continuer ?")) {
+    const products = JSON.parse(localStorage.getItem("allEntries"));
+    //Chercher le produit à supprimer dans le local storage
+    const productId = event.target.closest("article").dataset.id;
+    const productColor = event.target.closest("article").dataset.color;
+    //Supprimer le produit du local storage
+    const newBasket = products.filter(
+        (product) => !(product.id === productId && product.color === productColor));
+    //Mettre à jour le localstorage
+    localStorage.setItem("allEntries", JSON.stringify(newBasket));
+    //Supprimer le produit du DOM
+    event.target.closest("article").remove();
+    //Mettre à jour le total du panier
+    calculateTotal();
+}
 } 
   
 /*Modifier les quantités du panier et du local storage*/
 
-function setQuantity(event, products){
+function setQuantity(event){
+  const products = JSON.parse(localStorage.getItem("allEntries"));
   const newQuantity = event.target.value;
 //Condition pour seulement prendre en compte les quantités entre 1 et 100
   if(event.target.value > 0 && event.target.value <101){
@@ -105,7 +111,7 @@ function setQuantity(event, products){
     Object.assign (look, newQuantityValue);
     localStorage.setItem("allEntries", JSON.stringify(products));
     //Recalculer le panier 
-    calculateTotal(products); 
+    calculateTotal(); 
   } else {
     alert("Veuillez entrer une quantité comprise entre 1 et 100");
   }
@@ -113,7 +119,8 @@ function setQuantity(event, products){
 
 /*Calculer la quantité totale et le prix total des articles du panier*/
 
-function calculateTotal(products){ 
+async function calculateTotal() {
+  const products = await getFullProducts() 
 //Définir les variables des totaux quantité et prix pour le panier  
   let totalBasket = 0; 
   let totalQuantity = 0; 

@@ -19,6 +19,9 @@ fetch(`http://localhost:3000/api/products/${productId}`)
         product = new Product(res)
         loadProductDOM(product)
     })
+    .catch(function() {
+        alert("Le produit n'a pas pu être trouvé")
+    });
 //Remplir le HTML avec les données récupérées
 function loadProductDOM(product){
     document.querySelector('.item__content__description').innerHTML += product.description
